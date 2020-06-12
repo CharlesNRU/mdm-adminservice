@@ -153,10 +153,27 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$CurrentBIOSVersion = "Unknown",
 
-    [parameter(Mandatory = $false, HelpMessage = "For BIOSPackages only: Specify the system's current BIOS release date.")]
+    [parameter(Mandatory = $false, HelpMessage = "For BIOSPackages only: Specify the system's current BIOS release date in the following format: yyyyMMdd")]
     [ValidateNotNullOrEmpty()]
-    [Datetime]$CurrentBIOSReleaseDate = (Get-CimInstance -ClassName CIM_BIOSElement | Select-Object -ExpandProperty ReleaseDate | Get-Date),
-
+    [ValidateScript({
+        Try{
+            [datetime]::ParseExact($_,"yyyyMMdd",$null)
+            Return $true
+        }Catch{
+            throw "Date format needs to be `"yyyyMMdd`"."
+        }
+    })]
+    [string]$CurrentBIOSReleaseDate = $(
+        $date = Get-CimInstance -ClassName CIM_BIOSElement | Select-Object -ExpandProperty ReleaseDate
+        If($date){
+            #BIOS Release Date is not null, assigning the value in the expected format.
+            $date | Get-Date -Format "yyyyMMdd"
+        }Else{
+            #BIOS Release Date is null, assigning an old date
+            "19700101"
+        }
+    ),
+    
     [parameter(Mandatory = $false, HelpMessage = "Specify the path where the log file will be created.")]
     [ValidateScript({
         If(-not ($_ | Test-Path)){
@@ -486,11 +503,16 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                 }Else{
                     #Lenovo Only: Check if any of the remaining packages have a BIOS Release Date newer than the current BIOS Release Date
                     Add-TextToCMLog $LogFile  "Filtering package results to only packages that have a BIOS release date newer than `"$($CurrentBIOSReleaseDate)`"." $component 1
+                    $BIOSReleaseDate = [datetime]::ParseExact($CurrentBIOSReleaseDate,"yyyyMMdd",$null)
                     foreach($package in $Packages){
                         If($package.Description -match "\(Models included:(.*)\) \(Release Date:(.*)\)"){
-                            $ReleaseDate = [datetime]::ParseExact($matches[2],"yyyyMMdd",$null)
-                            If($ReleaseDate -gt $CurrentBIOSReleaseDate){
-                                [void]$ApplicableBIOSPackages.Add($package)
+                            Try{
+                                $ReleaseDate = [datetime]::ParseExact($matches[2],"yyyyMMdd",$null)
+                                If($ReleaseDate -gt $BIOSReleaseDate){
+                                    [void]$ApplicableBIOSPackages.Add($package)
+                                }
+                            }Catch{
+                                Add-TextToCMLog $LogFile  "Failed to parse `"$matches[2]`" as a BIOS release date for package `"$($package.Name)`", skipping..." $component 2
                             }
                         }
                     }
