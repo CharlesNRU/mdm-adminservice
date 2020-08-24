@@ -9,3 +9,4 @@ This is an export of the task sequences used for Applying BIOS or Driver package
 ## Details / Examples
 See the following blog posts for more details:
 [Modern Driver Management with the Administration Service](https://www.sysmansquad.com/2020/05/15/modern-driver-management-with-the-administration-service)
+[Modern BIOS Management with the Administration Service](https://www.sysmansquad.com/2020/06/18/modern-bios-management-with-the-administration-service/)
