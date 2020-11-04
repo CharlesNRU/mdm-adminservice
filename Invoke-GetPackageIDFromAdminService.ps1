@@ -76,16 +76,16 @@
     Invoke-GetPackageIDFromAdminService.ps1 -ServerFQDN "cm01.domain.com" -Username "CM_SvcAccount" -Password "123" -PackageType DriverPackage -Manufacturer "Dell" -Model "Optiplex 5050"
 
 .EXAMPLE
-    Find a 32-bit driver package for the manufacturer 'Hewlett-Packard' with the model name 'EliteBook 840 G4 Notebook PC' for Windows 10 1809
-    Invoke-GetPackageIDFromAdminService.ps1 -ServerFQDN "cm01.domain.com" -Username "CM_SvcAccount" -Password "123" -PackageType DriverPackage -Manufacturer "Hewlett-Packard" -Model "EliteBook 840 G4 Notebook PC" -DriverPackageOSArch x86 -DriverPackageReleaseId 1809
+    Find a 32-bit driver package for the manufacturer 'HP' with the model name 'EliteBook 840 G4 Notebook PC' for Windows 10 1809
+    Invoke-GetPackageIDFromAdminService.ps1 -ServerFQDN "cm01.domain.com" -Username "CM_SvcAccount" -Password "123" -PackageType DriverPackage -Manufacturer "HP" -Model "EliteBook 840 G4 Notebook PC" -DriverPackageOSArch x86 -DriverPackageReleaseId 1809
 
 .EXAMPLE
     Find a BIOS update package for the manufacturer 'Dell' with a System SystemSKU value of "07A2"
     Invoke-GetPackageIDFromAdminService.ps1 -ServerFQDN "cm01.domain.com" -Username "CM_SvcAccount" -Password "123" -PackageType BIOSPackage -Manufacturer "Dell" -SystemSKU "07A2" -CurrentBIOSVersion "1.23"
 
 .EXAMPLE
-    Find a 64-bit driver package for the manufacturer 'Hewlett-Packard' with a System SystemSKU value of "828c"
-    Invoke-GetPackageIDFromAdminService.ps1 -ServerFQDN "cm01.domain.com" -Username "CM_SvcAccount" -Password "123" -PackageType DriverPackage -Manufacturer "Hewlett-Packard" -SystemSKU "828c" -DriverPackageOSArch x64
+    Find a 64-bit driver package for the manufacturer 'HP' with a System SystemSKU value of "828c"
+    Invoke-GetPackageIDFromAdminService.ps1 -ServerFQDN "cm01.domain.com" -Username "CM_SvcAccount" -Password "123" -PackageType DriverPackage -Manufacturer "HP" -SystemSKU "828c" -DriverPackageOSArch x64
 
 .EXAMPLE
     Find a pilot BIOS update package for the manufacturer 'Lenovo' for the model 'ThinkPad X270'
@@ -458,7 +458,7 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                                         }
                                     }
                                 }
-                                "Hewlett-Packard"{
+                                "HP"{
                                     $packageVersion = ($package.Version).TrimEnd(".")
                                     $packageVersion = $packageVersion.Split(" ")[0] #Example: 02.02.03 A 1 --> Will only use 02.02.03 for evaluating
                                     If($packageVersion -as [Version]){
