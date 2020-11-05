@@ -360,24 +360,6 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
             $Packages = $Packages | Where-Object{$_.Description -ne ([string]::Empty)}
             Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
 
-            If($PackageType -eq "DriverPackage"){
-                # Filter for OS Architecture
-                Add-TextToCMLog $LogFile  "Filtering driver packages for the specified OS Architecture: `"$DriverPackageOSArch`"" $component 1
-                $Packages = $Packages | Where-Object{$_.Name -like "* $DriverPackageOSArch*"}
-                Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
-
-                #Filter for specific Windows 10 ReleaseId
-                If($DriverPackageReleaseId -ne 0){
-                    Add-TextToCMLog $LogFile  "Filtering driver package for the specified ReleaseID: `"$DriverPackageReleaseId`"" $component 1
-                    $ReleaseIdPackages = $Packages | Where-Object{$_.Name -like "* $DriverPackageReleaseId *"}
-                    If(($ReleaseIdPackages | Measure-Object).Count -gt 0){
-                        $Packages = $ReleaseIdPackages
-                    }Else{
-                        Add-TextToCMLog $LogFile  "Could not find any driver packages for ReleaseID `"$DriverPackageReleaseId`". Ignoring ReleaseId filter..." $component 2
-                    }
-                    Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
-                }
-            }
             If($SystemSKU -and ($SystemSKU -ne 'Unknown')){
                 Add-TextToCMLog $LogFile  "Filtering package results to only packages that have the SystemSKU `"$($SystemSKU)`" in the description field." $component 1
                 $SystemSKUMatchingPackages = New-Object System.Collections.ArrayList
@@ -426,7 +408,26 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                 $Packages = $Packages | Where-Object{$_.Name -like "*$Model*"}
                 Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
             }
+            
+            If($PackageType -eq "DriverPackage"){
+                # Filter for OS Architecture
+                Add-TextToCMLog $LogFile  "Filtering driver packages for the specified OS Architecture: `"$DriverPackageOSArch`"" $component 1
+                $Packages = $Packages | Where-Object{$_.Name -like "* $DriverPackageOSArch*"}
+                Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
 
+                #Filter for specific Windows 10 ReleaseId
+                If($DriverPackageReleaseId -ne 0){
+                    Add-TextToCMLog $LogFile  "Filtering driver package for the specified ReleaseID: `"$DriverPackageReleaseId`"" $component 1
+                    $ReleaseIdPackages = $Packages | Where-Object{$_.Name -like "* $DriverPackageReleaseId *"}
+                    If(($ReleaseIdPackages | Measure-Object).Count -gt 0){
+                        $Packages = $ReleaseIdPackages
+                    }Else{
+                        Add-TextToCMLog $LogFile  "Could not find any driver packages for ReleaseID `"$DriverPackageReleaseId`". Ignoring ReleaseId filter..." $component 2
+                    }
+                    Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
+                }
+            }
+            
             If($PackageType -eq "BIOSPackage"){
                 # Filter out packages that do not contain any value in the package version
                 Add-TextToCMLog $LogFile  "Filtering package results to only include packages that have version information in the version field" $component 1
