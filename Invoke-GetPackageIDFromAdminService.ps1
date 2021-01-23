@@ -49,7 +49,7 @@
     Note: Parameter is ignored for BIOS Packages.
 
 .PARAMETER DriverPackageReleaseId
-    If package is a driver package, specify which specific ReleaseId of Windows 10 you are looking for.
+    If package is a driver package, specify which specific ReleaseId of Windows 10 you are looking for. (1909, 2004, 20H2, etc.)
     Note 1: Parameter is ignored for BIOS Packages.
     Note 2: Some manufacturers (ex: Dell) do not have specific ReleaseId driver packages.
             If no suitable driver package is found for the specified ReleaseID, this filter will be ignored.
@@ -146,8 +146,7 @@ param(
 	[string]$DriverPackageOSArch = "x64",
 
     [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify the ReleaseId of Windows 10 that you are targeting (ex: 1909).")]
-    [ValidateRange(0,9999)]
-    [int]$DriverPackageReleaseId = 0,
+    [string]$DriverPackageReleaseId = "Unknown",
 
     [parameter(Mandatory = $false, HelpMessage = "For BIOSPackages only: Specify the system's current BIOS version.")]
     [ValidateNotNullOrEmpty()]
@@ -416,7 +415,7 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                 Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
 
                 #Filter for specific Windows 10 ReleaseId
-                If($DriverPackageReleaseId -ne 0){
+                If($DriverPackageReleaseId -ne "Unknown"){
                     Add-TextToCMLog $LogFile  "Filtering driver package for the specified ReleaseID: `"$DriverPackageReleaseId`"" $component 1
                     $ReleaseIdPackages = $Packages | Where-Object{$_.Name -like "* $DriverPackageReleaseId *"}
                     If(($ReleaseIdPackages | Measure-Object).Count -gt 0){
