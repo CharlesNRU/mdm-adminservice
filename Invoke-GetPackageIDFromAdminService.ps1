@@ -17,8 +17,28 @@
     You can also create custom driver packages from the tool if the vendor is not supported directly by the tool.
 
 .PARAMETER ServerFQDN
+    For intranet clients
     The fully qualified domain name of the server hosting the AdminService
+    
+.PARAMETER ExternalUrl
+    For internet clients
+    ExternalUrl of the AdminService you wish to connect to. You can find the ExternalUrl by directly querying your CM database.
+    Query: SELECT ProxyServerName,ExternalUrl FROM [dbo].[vProxy_Routings] WHERE [dbo].[vProxy_Routings].ExternalEndpointName = 'AdminService'
+    It should look like this: HTTPS://<YOURCMG>.<FQDN>/CCM_Proxy_ServerAuth/<RANDOM_NUMBER>/AdminService
+    
+.PARAMETER TenantId
+    For internet clients
+    Azure AD Tenant ID that is used for your CMG
 
+.PARAMETER ClientId
+    For internet clients
+    Client ID of the application registration created to interact with the AdminService
+
+.PARAMETER ApplicationIdUri
+    For internet clients
+    Application ID URI of the Configuration manager Server app created when creating your CMG.
+    The default value of 'https://ConfigMgrService' should be good for most people.
+    
 .PARAMETER Username
     The username that will be used to query the AdminService. This username needs at least the "Read" permission on packages in SCCM
 
@@ -90,69 +110,104 @@
 .EXAMPLE
     Find a pilot BIOS update package for the manufacturer 'Lenovo' for the model 'ThinkPad X270'
     Invoke-GetPackageIDFromAdminService.ps1 -ServerFQDN "cm01.domain.com" -Username "CM_SvcAccount" -Password "123" -PackageType BIOSPackage -Manufacturer "Lenovo" -Model "ThinkPad X270" -CurrentBIOSVersion "1.38" -PilotPackages $true
-    
+
+.EXAMPLE
+    Find a driver package for the manufacturer 'Dell' for the model name 'Optiplex 5050' via CMG
+    Invoke-GetPackageIDFromAdminService.ps1 -ExternalUrl "HTTPS://BOBCMG.BOBBY.COM/CCM_Proxy_ServerAuth/12124441919/AdminService" -TenantId b18e3ea8-164d-473d-aedc-65d9ed6afaa6 -CLientId b64efa47-bc07-4781-a022-3fd1345826e7 -Username CM_BOB@BOBBY.COM -Password 123 -PackageType DriverPackage -Manufacturer "Dell" -Model "Optiplex 5050"
+
 .NOTES
     FileName:    Invoke-GetPackageIDFromAdminService.ps1
     Author:      Charles Tousignant
     Contact:     @NoRemoteUsers
     Created:     2020-04-28
-    Updated:     2020-05-30
+    Updated:     2021-04-26
     
     Version history:
     1.0.0 (2020-04-28): Script created
     1.1.0 (2020-05-30): Added logic & parameters to filter any BIOS package retrieved that is not an update
                         Added boolean parameter 'PilotPackages' to allow querying for pilot packages
                         Improved the code to parse SKUs & ReleaseDate info from package descriptions
+    2.0.0 (2021-04-24): Added Support for CMG
+                        Added logic to dynamically install the required MSAL.PS module when using CMG
 #>
 [CmdletBinding()]
 param(
-    [parameter(Mandatory = $true, HelpMessage = "Set the FQDN of the server hosting the ConfigMgr AdminService.")]
+    [parameter(Mandatory = $true, HelpMessage = "Set the FQDN of the server hosting the ConfigMgr AdminService.", ParameterSetName = "Intranet")]
 	[ValidateNotNullOrEmpty()]
 	[string]$ServerFQDN,
+    
+    [parameter(Mandatory = $true, HelpMessage = "Set the CMG ExternalUrl for the AdminService.", ParameterSetName = "Internet")]
+	[ValidateNotNullOrEmpty()]
+	[string]$ExternalUrl,
+    
+    [parameter(Mandatory = $true, HelpMessage = "Set your TenantID.", ParameterSetName = "Internet")]
+	[ValidateNotNullOrEmpty()]
+	[string]$TenantID,
+    
+    [parameter(Mandatory = $true, HelpMessage = "Set the ClientID of app registration to interact with the AdminService.", ParameterSetName = "Internet")]
+	[ValidateNotNullOrEmpty()]
+	[string]$ClientID,
+    
+    [parameter(Mandatory = $false, HelpMessage = "Specify URI here if using non-default Application ID URI for the configuration manager server app.", ParameterSetName = "Internet")]
+	[ValidateNotNullOrEmpty()]
+	[string]$ApplicationIdUri = 'https://ConfigMgrService',
+        
 
-    [parameter(Mandatory = $false, HelpMessage = "Specify the username that will be used to query the AdminService.")]
+    [parameter(Mandatory = $false, HelpMessage = "Specify the username that will be used to query the AdminService.", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $true, HelpMessage = "Specify the username that will be used to query the AdminService.", ParameterSetName = "Internet")]
 	[ValidateNotNullOrEmpty()]
 	[string]$Username,
 
-    [parameter(Mandatory = $false, HelpMessage = "Specify the password for the username that will be used to query the AdminService.")]
+    [parameter(Mandatory = $false, HelpMessage = "Specify the password for the username that will be used to query the AdminService.", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $true, HelpMessage = "Specify the password for the username that will be used to query the AdminService.", ParameterSetName = "Internet")]
 	[ValidateNotNullOrEmpty()]
 	[string]$Password,
 
-    [parameter(Mandatory = $false, HelpMessage = "If set to True, PowerShell will bypass SSL certificate checks when contacting the AdminService.")]
+    [parameter(Mandatory = $false, HelpMessage = "If set to True, PowerShell will bypass SSL certificate checks when contacting the AdminService.", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $false, HelpMessage = "If set to True, PowerShell will bypass SSL certificate checks when contacting the AdminService.", ParameterSetName = "Internet")]
     [bool]$BypassCertCheck = $false,
 
-    [parameter(Mandatory = $false, HelpMessage = "Specify the manufacturer of the device.")]
+    [parameter(Mandatory = $false, HelpMessage = "Specify the manufacturer of the device.", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $false, HelpMessage = "Specify the manufacturer of the device.", ParameterSetName = "Internet")]
     [ValidateNotNullOrEmpty()]
     [string]$Manufacturer = "Unknown",
 
-    [parameter(Mandatory = $false, HelpMessage = "Specify the model of the device.")]
+    [parameter(Mandatory = $false, HelpMessage = "Specify the model of the device.", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $false, HelpMessage = "Specify the model of the device.", ParameterSetName = "Internet")]
     [ValidateNotNullOrEmpty()]
     [string]$Model = "Unknown",
 
-    [parameter(Mandatory = $false, HelpMessage = "Specify the SystemSKU of the device.")]
+    [parameter(Mandatory = $false, HelpMessage = "Specify the SystemSKU of the device.", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $false, HelpMessage = "Specify the SystemSKU of the device.", ParameterSetName = "Internet")]
     [ValidateNotNullOrEmpty()]
     [string]$SystemSKU = "Unknown",
 
-    [parameter(Mandatory = $true, HelpMessage = "Specify the package type that will be returned: DriverPackage or BIOSPackage.")]
+    [parameter(Mandatory = $true, HelpMessage = "Specify the package type that will be returned: DriverPackage or BIOSPackage.", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $true, HelpMessage = "Specify the package type that will be returned: DriverPackage or BIOSPackage.", ParameterSetName = "Internet")]
     [ValidateNotNullOrEmpty()]
     [ValidateSet("DriverPackage", "BIOSPackage")]
     [string]$PackageType,
     
-    [parameter(Mandatory = $false, HelpMessage = "If set to True, the script will only return pilot packages.")]
+    [parameter(Mandatory = $false, HelpMessage = "If set to True, the script will only return pilot packages.", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $false, HelpMessage = "If set to True, the script will only return pilot packages.", ParameterSetName = "Internet")]
     [bool]$PilotPackages = $false,
 
-    [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify OS Architecture")]
+    [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify OS Architecture", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify OS Architecture", ParameterSetName = "Internet")]
     [ValidateSet("x64", "x86")]
 	[string]$DriverPackageOSArch = "x64",
 
-    [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify the ReleaseId of Windows 10 that you are targeting (ex: 1909).")]
+    [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify the ReleaseId of Windows 10 that you are targeting (ex: 1909).", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify the ReleaseId of Windows 10 that you are targeting (ex: 1909).", ParameterSetName = "Internet")]
     [string]$DriverPackageReleaseId = "Unknown",
 
-    [parameter(Mandatory = $false, HelpMessage = "For BIOSPackages only: Specify the system's current BIOS version.")]
+    [parameter(Mandatory = $false, HelpMessage = "For BIOSPackages only: Specify the system's current BIOS version.", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $false, HelpMessage = "For BIOSPackages only: Specify the system's current BIOS version.", ParameterSetName = "Internet")]
     [ValidateNotNullOrEmpty()]
     [string]$CurrentBIOSVersion = "Unknown",
 
-    [parameter(Mandatory = $false, HelpMessage = "For BIOSPackages only: Specify the system's current BIOS release date in the following format: yyyyMMdd")]
+    [parameter(Mandatory = $false, HelpMessage = "For BIOSPackages only: Specify the system's current BIOS release date in the following format: yyyyMMdd", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $false, HelpMessage = "For BIOSPackages only: Specify the system's current BIOS release date in the following format: yyyyMMdd", ParameterSetName = "Internet")]
     [ValidateNotNullOrEmpty()]
     [ValidateScript({
         Try{
@@ -272,6 +327,65 @@ Begin {
     }Catch{
         Write-Error -Message "Failed to write to the logfile `"$LogFile`"" -ErrorAction Stop
     }
+    
+    Function Get-AdminServiceUri{
+        If($ServerFQDN){
+            Return "https://$($ServerFQDN)/AdminService"
+        }
+        If($ExternalUrl){
+            Return $ExternalUrl
+        }
+    }
+    
+    Function Import-MSALPSModule{
+        Add-TextToCMLog $LogFile "Checking if MSAL.PS module is available on the device." $component 1
+        $MSALModule = Get-Module -ListAvailable MSAL.PS
+        If($MSALModule){
+            Add-TextToCMLog $LogFile "Module is already available." $component 1
+        }Else{
+            #Setting PowerShell to use TLS 1.2 for PowerShell Gallery
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            
+            Add-TextToCMLog $LogFile "MSAL.PS is not installed, checking for prerequisites before installing module." $component 1
+            
+            Add-TextToCMLog $LogFile "Checking for NuGet package provider... " $component 1
+            If(-not (Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue)){
+                Add-TextToCMLog $LogFile "NuGet package provider is not installed, installing NuGet..." $component 1
+                $NuGetVersion = Install-PackageProvider -Name NuGet -Force -ErrorAction Stop | Select-Object -ExpandProperty Version
+                Add-TextToCMLog $LogFile "NuGet package provider version $($NuGetVersion) installed." $component 1
+            }
+            
+            Add-TextToCMLog $LogFile "Checking for PowerShellGet module version 2 or higher " $component 1
+            $PowerShellGetLatestVersion = Get-Module -ListAvailable -Name PowerShellGet | Sort-Object -Property Version -Descending | Select-Object -First 1 -ExpandProperty Version       
+            If((-not $PowerShellGetLatestVersion)){
+                Add-TextToCMLog $LogFile "Could not find any version of PowerShellGet installed." $component 1
+            }
+            If(($PowerShellGetLatestVersion.Major -lt 2)){
+                Add-TextToCMLog $LogFile "Current PowerShellGet version is $($PowerShellGetLatestVersion) and needs to be updated." $component 1
+            }
+            If((-not $PowerShellGetLatestVersion) -or ($PowerShellGetLatestVersion.Major -lt 2)){
+                Add-TextToCMLog $LogFile "Installing latest version of PowerShellGet..." $component 1
+                Install-Module -Name PowerShellGet -AllowClobber -Force
+                $InstalledVersion = Get-Module -ListAvailable -Name PowerShellGet | Sort-Object -Property Version -Descending | Select-Object -First 1 -ExpandProperty Version
+                Add-TextToCMLog $LogFile "PowerShellGet module version $($InstalledVersion) installed." $component 1
+            }
+            
+            Add-TextToCMLog $LogFile "Installing MSAL.PS module..." $component 1
+            If((-not $PowerShellGetLatestVersion) -or ($PowerShellGetLatestVersion.Major -lt 2)){
+                Add-TextToCMLog $LogFile "Starting another powershell process to install the module..." $component 1
+                $result = Start-Process -FilePath powershell.exe -ArgumentList "Install-Module MSAL.PS -AcceptLicense -Force" -PassThru -Wait -NoNewWindow
+                If($result.ExitCode -ne 0){
+                    Add-TextToCMLog $LogFile "Failed to install MSAL.PS module" $component 3
+                    Throw "Failed to install MSAL.PS module"
+                }
+            }Else{
+                Install-Module MSAL.PS -AcceptLicense -Force
+            }
+        }
+        Add-TextToCMLog $LogFile "Importing MSAL.PS module..." $component 1
+        Import-module MSAL.PS -Force
+        Add-TextToCMLog $LogFile "MSAL.PS module successfully imported." $component 1
+    }
 }
 Process{
     Try{
@@ -279,21 +393,35 @@ Process{
             Add-TextToCMLog -Value "No model or SystemSKU provided, we need at least one of these values to determine a suitable package." -LogFile $LogFile -Component $component -Severity 3
             Return
         }
-
-        If($Username){
-            If($Password){
-                $Global:Credential = New-Object System.Management.Automation.PSCredential -ArgumentList $Username,($Password | ConvertTo-SecureString -AsPlainText -Force)
-                $Global:InvokeRestMethodCredential = @{
-                    "Credential" = ($Global:Credential)
+        
+        Add-TextToCMLog -Value "Processing credentials..." -LogFile $LogFile -Component $component -Severity 1
+        switch($PSCmdlet.ParameterSetName){
+            "Intranet"{
+                If($Username){
+                    If($Password){
+                        Add-TextToCMLog -Value "Using provided username & password to query the AdminService." -LogFile $LogFile -Component $component -Severity 3
+                        $Credential = New-Object System.Management.Automation.PSCredential -ArgumentList $Username,($Password | ConvertTo-SecureString -AsPlainText -Force)
+                        $InvokeRestMethodCredential = @{
+                            "Credential" = ($Credential)
+                        }
+                    }Else{
+                        Add-TextToCMLog -Value "Username provided without a password, please specify a password." -LogFile $LogFile -Component $component -Severity 3
+                        Return
+                    }
+                }Else{
+                    Add-TextToCMLog -Value "No username provided, using current user credentials to query the AdminService." -LogFile $LogFile -Component $component -Severity 1
+                    $InvokeRestMethodCredential = @{
+                        "UseDefaultCredentials" = $True
+                    }
                 }
-            }Else{
-                Add-TextToCMLog -Value "Username provided without a password, please specify a password." -LogFile $LogFile -Component $component -Severity 3
-                Return
+                
             }
-        }Else{
-            Add-TextToCMLog -Value "Using default credentials to query the AdminService." -LogFile $LogFile -Component $component -Severity 1
-            $Global:InvokeRestMethodCredential = @{
-                "UseDefaultCredentials" = $True
+            "Internet"{
+                Import-MSALPSModule
+                $Credential = New-Object System.Management.Automation.PSCredential -ArgumentList $Username,($Password | ConvertTo-SecureString -AsPlainText -Force)
+                Add-TextToCMLog -Value "Getting access token to query the AdminService via CMG." -LogFile $LogFile -Component $component -Severity 1
+                $Token = Get-MsalToken -TenantId $TenantID -ClientId $ClientID -UserCredential $Credential -Scopes ([String]::Concat($($ApplicationIdUri),'/user_impersonation')) -ErrorAction Stop
+                Add-TextToCMLog -Value "Successfully retrieved access token." -LogFile $LogFile -Component $component -Severity 1
             }
         }
 
@@ -314,11 +442,9 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
             [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Ssl3, [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12
         }
-
-        #Build AdminService URI
-        [string]$Global:BaseUrl = "https://$($ServerFQDN)/AdminService"
-        $WMIPackageURL = $Global:BaseUrl + "/wmi/SMS_Package"
-        Add-TextToCMLog $LogFile  "Retrieving list of SMS_Package from the AdminService @ `"$($WMIPackageURL)`"" $component 1
+       
+        $WMIPackageURL = [String]::Concat($(Get-AdminServiceUri),"/wmi/SMS_Package")
+        Add-TextToCMLog $LogFile  "Retrieving list of packages from the AdminService @ `"$($WMIPackageURL)`"" $component 1
 
         switch($PackageType){
             "DriverPackage"{
@@ -342,7 +468,19 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
             "`$select" = "Name,Description,Manufacturer,Version,SourceDate,PackageID"
         }
 
-        $Packages = (Invoke-RestMethod -Method Get -Uri $WMIPackageURL -Body $Body @Global:InvokeRestMethodCredential | Select-Object -ExpandProperty value)
+        switch($PSCmdlet.ParameterSetName){
+            'Intranet'{
+                $Packages = Invoke-RestMethod -Method Get -Uri $WMIPackageURL -Body $Body @InvokeRestMethodCredential | Select-Object -ExpandProperty value
+            }
+            'Internet'{
+                $authHeader = @{
+                    'Content-Type'  = 'application/json'
+                    'Authorization' = "Bearer " + $token.AccessToken
+                    'ExpiresOn'	    = $token.ExpiresOn
+                }
+                $Packages = Invoke-RestMethod -Method Get -Uri $WMIPackageURL -Headers $authHeader -Body $Body | Select-Object -ExpandProperty value
+            }
+        }      
 
         If(($Packages | Measure-Object).Count -gt 0){
             Add-TextToCMLog $LogFile  "Initial count of packages before starting filtering process: $(($Packages | Measure-Object).Count)" $component 1
