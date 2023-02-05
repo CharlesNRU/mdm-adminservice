@@ -120,7 +120,7 @@
     Author:      Charles Tousignant
     Contact:     @NoRemoteUsers
     Created:     2020-04-28
-    Updated:     2021-04-26
+    Updated:     2023-02-04
     
     Version history:
     1.0.0 (2020-04-28): Script created
@@ -129,6 +129,8 @@
                         Improved the code to parse SKUs & ReleaseDate info from package descriptions
     2.0.0 (2021-04-24): Added Support for CMG
                         Added logic to dynamically install the required MSAL.PS module when using CMG
+    2.1.0 (2023-02-04): Changes in the AdminService in CB2111 caused the Invoke-restmethod fail when using
+                        -Body parameter to specify filtering criteria, implemented workaround.
 #>
 [CmdletBinding()]
 param(
@@ -468,9 +470,20 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
             "`$select" = "Name,Description,Manufacturer,Version,SourceDate,PackageID"
         }
 
+        #Fix for AdminService CB2111 and newer
+        Add-Type -AssemblyName System.Web
+        $BodyParameters = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+        foreach ($param in $Body.GetEnumerator()) {
+            $BodyParameters.Add($param.Name, $param.Value)
+        }
+        $Request = [System.UriBuilder]($WMIPackageURI)
+        $Request.Query = $BodyParameters.ToString()
+        $DecodedURI = [System.Web.HttpUtility]::UrlDecode($Request.Uri)
+
+
         switch($PSCmdlet.ParameterSetName){
             'Intranet'{
-                $Packages = Invoke-RestMethod -Method Get -Uri $WMIPackageURL -Body $Body @InvokeRestMethodCredential | Select-Object -ExpandProperty value
+                $Packages = Invoke-RestMethod -Method Get -Uri $DecodedURI @InvokeRestMethodCredential | Select-Object -ExpandProperty value
             }
             'Internet'{
                 $authHeader = @{
@@ -478,7 +491,7 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                     'Authorization' = "Bearer " + $token.AccessToken
                     'ExpiresOn'	    = $token.ExpiresOn
                 }
-                $Packages = Invoke-RestMethod -Method Get -Uri $WMIPackageURL -Headers $authHeader -Body $Body | Select-Object -ExpandProperty value
+                $Packages = Invoke-RestMethod -Method Get -Uri $DecodedURI -Headers $authHeader | Select-Object -ExpandProperty value
             }
         }      
 
