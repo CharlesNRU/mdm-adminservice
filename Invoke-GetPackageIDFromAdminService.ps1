@@ -476,7 +476,7 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
         foreach ($param in $Body.GetEnumerator()) {
             $BodyParameters.Add($param.Name, $param.Value)
         }
-        $Request = [System.UriBuilder]($WMIPackageURI)
+        $Request = [System.UriBuilder]($WMIPackageURL)
         $Request.Query = $BodyParameters.ToString()
         $DecodedURI = [System.Web.HttpUtility]::UrlDecode($Request.Uri)
 
