@@ -445,8 +445,8 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Ssl3, [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12
         }
        
-        $WMIPackageURL = [String]::Concat($(Get-AdminServiceUri),"/wmi/SMS_Package")
-        Add-TextToCMLog $LogFile  "Retrieving list of packages from the AdminService @ `"$($WMIPackageURL)`"" $component 1
+        $WMIPackageURI = [String]::Concat($(Get-AdminServiceUri),"/wmi/SMS_Package")
+        Add-TextToCMLog $LogFile  "Retrieving list of packages from the AdminService @ `"$($WMIPackageURI)`"" $component 1
 
         switch($PackageType){
             "DriverPackage"{
@@ -476,7 +476,7 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
         foreach ($param in $Body.GetEnumerator()) {
             $BodyParameters.Add($param.Name, $param.Value)
         }
-        $Request = [System.UriBuilder]($WMIPackageURL)
+        $Request = [System.UriBuilder]($WMIPackageURI)
         $Request.Query = $BodyParameters.ToString()
         $DecodedURI = [System.Web.HttpUtility]::UrlDecode($Request.Uri)
 
