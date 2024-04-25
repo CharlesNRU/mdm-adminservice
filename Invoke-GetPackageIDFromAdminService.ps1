@@ -197,7 +197,11 @@ param(
     [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify OS Architecture", ParameterSetName = "Intranet")]
     [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify OS Architecture", ParameterSetName = "Internet")]
     [ValidateSet("x64", "x86")]
-	[string]$DriverPackageOSArch = "x64",
+    [string]$DriverPackageOSArch = "x64",
+
+    [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify the version of Windows (ex: Windows 10).", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify the version of Windows (ex: Windows 11).", ParameterSetName = "Internet")]
+    [string]$DriverPackageWinVer = "Unknown",
 
     [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify the ReleaseId of Windows 10 that you are targeting (ex: 1909).", ParameterSetName = "Intranet")]
     [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify the ReleaseId of Windows 10 that you are targeting (ex: 1909).", ParameterSetName = "Internet")]
@@ -375,7 +379,7 @@ Begin {
             Add-TextToCMLog $LogFile "Installing MSAL.PS module..." $component 1
             If((-not $PowerShellGetLatestVersion) -or ($PowerShellGetLatestVersion.Major -lt 2)){
                 Add-TextToCMLog $LogFile "Starting another powershell process to install the module..." $component 1
-                $result = Start-Process -FilePath powershell.exe -ArgumentList "Install-Module MSAL.PS -AcceptLicense -Force" -PassThru -Wait -NoNewWindow
+                $result = Start-Process -FilePath powershell.exe -ArgumentList "Install-Module MSAL.PS -Force" -PassThru -Wait -NoNewWindow
                 If($result.ExitCode -ne 0){
                     Add-TextToCMLog $LogFile "Failed to install MSAL.PS module" $component 3
                     Throw "Failed to install MSAL.PS module"
@@ -563,6 +567,11 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                 # Filter for OS Architecture
                 Add-TextToCMLog $LogFile  "Filtering driver packages for the specified OS Architecture: `"$DriverPackageOSArch`"" $component 1
                 $Packages = $Packages | Where-Object{$_.Name -like "* $DriverPackageOSArch*"}
+                Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
+
+                # Filter for OS version
+                Add-TextToCMLog $LogFile  "Filtering driver packages for the specified OS type: `"$DriverPackageWinVer`"" $component 1
+                $Packages = $Packages | Where-Object{$_.Name -like "* $DriverPackageWinVer*"}
                 Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
 
                 #Filter for specific Windows 10 ReleaseId
