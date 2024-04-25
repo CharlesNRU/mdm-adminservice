@@ -120,7 +120,7 @@
     Author:      Charles Tousignant
     Contact:     @NoRemoteUsers
     Created:     2020-04-28
-    Updated:     2023-02-04
+    Updated:     2024-04-25
     
     Version history:
     1.0.0 (2020-04-28): Script created
@@ -131,6 +131,8 @@
                         Added logic to dynamically install the required MSAL.PS module when using CMG
     2.1.0 (2023-02-04): Changes in the AdminService in CB2111 caused the Invoke-restmethod fail when using
                         -Body parameter to specify filtering criteria, implemented workaround.
+    2.1.1 (2024-04-25): Added Win10/11 filtering. Fixed -AcceptLicense parameter for powershellget < 2. - Dan Hammond
+
 #>
 [CmdletBinding()]
 param(
