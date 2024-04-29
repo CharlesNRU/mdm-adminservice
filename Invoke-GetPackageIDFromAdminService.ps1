@@ -382,13 +382,13 @@ Begin {
             }
 	    
             If(-not $InstalledVersion){
-	         Add-TextToCMLog $LogFile "Unable to find PowerShellGet" $component 1
+	         Add-TextToCMLog $LogFile "Unable to find PowerShellGet" $component 3
 	         Throw "Failed to install PowerShellGet"
                 }
             Add-TextToCMLog $LogFile "Installing MSAL.PS module..." $component 1
             If($InstalledVersion.Major -eq 1){
                Install-Module MSAL.PS -Force
-               Add-TextToCMLog $LogFile "Installed MSAL.PS module using powershellget 1" $component 3
+               Add-TextToCMLog $LogFile "Installed MSAL.PS module using powershellget 1" $component 1
 		}
             ElseIf($InstalledVersion.Major -gt $PowerShellGetLatestVersion.Major){
                 Add-TextToCMLog $LogFile "Starting another powershell process to install the module..." $component 1
