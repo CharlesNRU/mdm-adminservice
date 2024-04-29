@@ -377,11 +377,22 @@ Begin {
                 $InstalledVersion = Get-Module -ListAvailable -Name PowerShellGet | Sort-Object -Property Version -Descending | Select-Object -First 1 -ExpandProperty Version
                 Add-TextToCMLog $LogFile "PowerShellGet module version $($InstalledVersion) installed." $component 1
             }
-            
+            If($PowerShellGetLatestVersion.Major -eq 2)){
+                $InstalledVersion = $PowerShellGetLatestVersion
+            }
+	    
+            If(-not $InstalledVersion){
+	         Add-TextToCMLog $LogFile "Unable to find PowerShellGet" $component 1
+	         Throw "Failed to install PowerShellGet"
+
             Add-TextToCMLog $LogFile "Installing MSAL.PS module..." $component 1
-            If((-not $PowerShellGetLatestVersion) -or ($PowerShellGetLatestVersion.Major -lt 2)){
+            If($InstalledVersion.Major -eq 1){
+               Install-Module MSAL.PS -Force
+               Add-TextToCMLog $LogFile "Installed MSAL.PS module using powershellget 1" $component 3
+		}
+            ElseIf($InstalledVersion.Major -gt $PowerShellGetLatestVersion.Major){
                 Add-TextToCMLog $LogFile "Starting another powershell process to install the module..." $component 1
-                $result = Start-Process -FilePath powershell.exe -ArgumentList "Install-Module MSAL.PS -Force" -PassThru -Wait -NoNewWindow
+                $result = Start-Process -FilePath powershell.exe -ArgumentList "Install-Module MSAL.PS -AcceptLicense -Force" -PassThru -Wait -NoNewWindow
                 If($result.ExitCode -ne 0){
                     Add-TextToCMLog $LogFile "Failed to install MSAL.PS module" $component 3
                     Throw "Failed to install MSAL.PS module"
