@@ -368,7 +368,7 @@ Begin {
             If((-not $PowerShellGetLatestVersion)){
                 Add-TextToCMLog $LogFile "Could not find any version of PowerShellGet installed." $component 1
             }
-            If(($PowerShellGetLatestVersion.Major -lt 2)){
+            If($PowerShellGetLatestVersion.Major -lt 2){
                 Add-TextToCMLog $LogFile "Current PowerShellGet version is $($PowerShellGetLatestVersion) and needs to be updated." $component 1
             }
             If((-not $PowerShellGetLatestVersion) -or ($PowerShellGetLatestVersion.Major -lt 2)){
@@ -377,14 +377,14 @@ Begin {
                 $InstalledVersion = Get-Module -ListAvailable -Name PowerShellGet | Sort-Object -Property Version -Descending | Select-Object -First 1 -ExpandProperty Version
                 Add-TextToCMLog $LogFile "PowerShellGet module version $($InstalledVersion) installed." $component 1
             }
-            If($PowerShellGetLatestVersion.Major -eq 2)){
+            If($PowerShellGetLatestVersion.Major -eq 2){
                 $InstalledVersion = $PowerShellGetLatestVersion
             }
 	    
             If(-not $InstalledVersion){
 	         Add-TextToCMLog $LogFile "Unable to find PowerShellGet" $component 1
 	         Throw "Failed to install PowerShellGet"
-
+                }
             Add-TextToCMLog $LogFile "Installing MSAL.PS module..." $component 1
             If($InstalledVersion.Major -eq 1){
                Install-Module MSAL.PS -Force
