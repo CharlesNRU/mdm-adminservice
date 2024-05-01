@@ -131,7 +131,8 @@
                         Added logic to dynamically install the required MSAL.PS module when using CMG
     2.1.0 (2023-02-04): Changes in the AdminService in CB2111 caused the Invoke-restmethod fail when using
                         -Body parameter to specify filtering criteria, implemented workaround.
-    2.1.1 (2024-04-25): Added Win10/11 filtering. Fixed -AcceptLicense parameter for powershellget < 2. - Dan Hammond
+    2.1.1 (2024-04-25): Added Win10/11 filtering.
+                        Fixed -AcceptLicense parameter for powershellget < 2. - Dan Hammond
 
 #>
 [CmdletBinding()]
@@ -583,9 +584,11 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                 Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
 
                 # Filter for OS version
-                Add-TextToCMLog $LogFile  "Filtering driver packages for the specified OS type: `"$DriverPackageWinVer`"" $component 1
-                $Packages = $Packages | Where-Object{$_.Name -like "* $DriverPackageWinVer*"}
-                Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
+                If($DriverPackageWinVer -ne "Unknown"){
+                    Add-TextToCMLog $LogFile  "Filtering driver packages for the specified Windows version: `"$DriverPackageWinVer`"" $component 1
+                    $Packages = $Packages | Where-Object{$_.Name -like "* $DriverPackageWinVer*"}
+                    Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
+                }
 
                 #Filter for specific Windows 10 ReleaseId
                 If($DriverPackageReleaseId -ne "Unknown"){
