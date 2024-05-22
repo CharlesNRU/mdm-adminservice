@@ -74,6 +74,11 @@
     Note 2: Some manufacturers (ex: Dell) do not have specific ReleaseId driver packages.
             If no suitable driver package is found for the specified ReleaseID, this filter will be ignored.
 
+.PARAMETER DriverPackageWinVer
+    If package is a driver package, specify which specific version Windows you are looking for. (Windows 10 or Windows 11.)
+    Parameter can be specified in a task sequence or will be queried if task sequence is running in Full OS
+    Note: Parameter is ignored for BIOS Packages.
+    
 .PARAMETER CurrentBIOSVersion
     If package is a BIOS package, specify the current BIOS version.
     Vendors each have their own version name standards, make sure it matches version naming in your packages.
