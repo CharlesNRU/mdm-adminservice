@@ -1,6 +1,13 @@
 # Modern BIOS/Driver Management with the Administration Service
 This solution is used together with packages created by the [Driver Automation Tool](https://github.com/maurice-daly/DriverAutomationTool) and allows you to dynamically apply drivers or BIOS packages to systems during a task sequence.
 
+### 2024-05-25: Windows OS version fitlering / MSAL.PS removal
+- Windows OS version support: Added new parameter "DriverPackageWinVer" to provide additional filtering for a target Windows OS version when applying drivers. This allows you to specify, for example, if the driver package should be for "Windows 10" or "Windows 11".  
+Note: The filtering logic expects the string to be in the driver package name.
+- MSAL.PS Removal : Removed dependency on MSAL.PS module when querying AdminService over CMG
+- Updated MDM-TS.zip  
+Huge thanks to @FlannelNZ for his help on this release.
+
 ### 2021-04-27: [Now works with CMG](https://sysmansquad.com/2021/04/27/updated-modern-driver-bios-management-with-cmg-support/)
 - Full OS support : Drivers and BIOS updates over CMG
 - WinPE support: Bare metal deployment over CMG

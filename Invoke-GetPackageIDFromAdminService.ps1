@@ -74,6 +74,11 @@
     Note 2: Some manufacturers (ex: Dell) do not have specific ReleaseId driver packages.
             If no suitable driver package is found for the specified ReleaseID, this filter will be ignored.
 
+.PARAMETER DriverPackageWinVer
+    If package is a driver package, specify which specific version Windows you are looking for. (Windows 10 or Windows 11.)
+    Parameter can be specified in a task sequence or will be queried if task sequence is running in Full OS
+    Note: Parameter is ignored for BIOS Packages.
+    
 .PARAMETER CurrentBIOSVersion
     If package is a BIOS package, specify the current BIOS version.
     Vendors each have their own version name standards, make sure it matches version naming in your packages.
@@ -120,7 +125,7 @@
     Author:      Charles Tousignant
     Contact:     @NoRemoteUsers
     Created:     2020-04-28
-    Updated:     2023-02-04
+    Updated:     2024-05-01
     
     Version history:
     1.0.0 (2020-04-28): Script created
@@ -131,6 +136,9 @@
                         Added logic to dynamically install the required MSAL.PS module when using CMG
     2.1.0 (2023-02-04): Changes in the AdminService in CB2111 caused the Invoke-restmethod fail when using
                         -Body parameter to specify filtering criteria, implemented workaround.
+    2.1.1 (2024-04-25): Added Win10/11 filtering. -Dan Hammond (@FlannelNZ)
+    2.2.0 (2024-05-01): Removed dependency on MSAL.PS module when using CMG
+
 #>
 [CmdletBinding()]
 param(
@@ -197,7 +205,11 @@ param(
     [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify OS Architecture", ParameterSetName = "Intranet")]
     [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify OS Architecture", ParameterSetName = "Internet")]
     [ValidateSet("x64", "x86")]
-	[string]$DriverPackageOSArch = "x64",
+    [string]$DriverPackageOSArch = "x64",
+
+    [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify the version of Windows (ex: Windows 10).", ParameterSetName = "Intranet")]
+    [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify the version of Windows (ex: Windows 11).", ParameterSetName = "Internet")]
+    [string]$DriverPackageWinVer = "Unknown",
 
     [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify the ReleaseId of Windows 10 that you are targeting (ex: 1909).", ParameterSetName = "Intranet")]
     [parameter(Mandatory = $false, HelpMessage = "For DriverPackages only: Specify the ReleaseId of Windows 10 that you are targeting (ex: 1909).", ParameterSetName = "Internet")]
@@ -338,56 +350,6 @@ Begin {
             Return $ExternalUrl
         }
     }
-    
-    Function Import-MSALPSModule{
-        Add-TextToCMLog $LogFile "Checking if MSAL.PS module is available on the device." $component 1
-        $MSALModule = Get-Module -ListAvailable MSAL.PS
-        If($MSALModule){
-            Add-TextToCMLog $LogFile "Module is already available." $component 1
-        }Else{
-            #Setting PowerShell to use TLS 1.2 for PowerShell Gallery
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            
-            Add-TextToCMLog $LogFile "MSAL.PS is not installed, checking for prerequisites before installing module." $component 1
-            
-            Add-TextToCMLog $LogFile "Checking for NuGet package provider... " $component 1
-            If(-not (Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue)){
-                Add-TextToCMLog $LogFile "NuGet package provider is not installed, installing NuGet..." $component 1
-                $NuGetVersion = Install-PackageProvider -Name NuGet -Force -ErrorAction Stop | Select-Object -ExpandProperty Version
-                Add-TextToCMLog $LogFile "NuGet package provider version $($NuGetVersion) installed." $component 1
-            }
-            
-            Add-TextToCMLog $LogFile "Checking for PowerShellGet module version 2 or higher " $component 1
-            $PowerShellGetLatestVersion = Get-Module -ListAvailable -Name PowerShellGet | Sort-Object -Property Version -Descending | Select-Object -First 1 -ExpandProperty Version       
-            If((-not $PowerShellGetLatestVersion)){
-                Add-TextToCMLog $LogFile "Could not find any version of PowerShellGet installed." $component 1
-            }
-            If(($PowerShellGetLatestVersion.Major -lt 2)){
-                Add-TextToCMLog $LogFile "Current PowerShellGet version is $($PowerShellGetLatestVersion) and needs to be updated." $component 1
-            }
-            If((-not $PowerShellGetLatestVersion) -or ($PowerShellGetLatestVersion.Major -lt 2)){
-                Add-TextToCMLog $LogFile "Installing latest version of PowerShellGet..." $component 1
-                Install-Module -Name PowerShellGet -AllowClobber -Force
-                $InstalledVersion = Get-Module -ListAvailable -Name PowerShellGet | Sort-Object -Property Version -Descending | Select-Object -First 1 -ExpandProperty Version
-                Add-TextToCMLog $LogFile "PowerShellGet module version $($InstalledVersion) installed." $component 1
-            }
-            
-            Add-TextToCMLog $LogFile "Installing MSAL.PS module..." $component 1
-            If((-not $PowerShellGetLatestVersion) -or ($PowerShellGetLatestVersion.Major -lt 2)){
-                Add-TextToCMLog $LogFile "Starting another powershell process to install the module..." $component 1
-                $result = Start-Process -FilePath powershell.exe -ArgumentList "Install-Module MSAL.PS -AcceptLicense -Force" -PassThru -Wait -NoNewWindow
-                If($result.ExitCode -ne 0){
-                    Add-TextToCMLog $LogFile "Failed to install MSAL.PS module" $component 3
-                    Throw "Failed to install MSAL.PS module"
-                }
-            }Else{
-                Install-Module MSAL.PS -AcceptLicense -Force
-            }
-        }
-        Add-TextToCMLog $LogFile "Importing MSAL.PS module..." $component 1
-        Import-module MSAL.PS -Force
-        Add-TextToCMLog $LogFile "MSAL.PS module successfully imported." $component 1
-    }
 }
 Process{
     Try{
@@ -419,10 +381,17 @@ Process{
                 
             }
             "Internet"{
-                Import-MSALPSModule
-                $Credential = New-Object System.Management.Automation.PSCredential -ArgumentList $Username,($Password | ConvertTo-SecureString -AsPlainText -Force)
                 Add-TextToCMLog -Value "Getting access token to query the AdminService via CMG." -LogFile $LogFile -Component $component -Severity 1
-                $Token = Get-MsalToken -TenantId $TenantID -ClientId $ClientID -UserCredential $Credential -Scopes ([String]::Concat($($ApplicationIdUri),'/user_impersonation')) -ErrorAction Stop
+                $body = @{
+                    grant_type  = "password"
+                    scope       = ([String]::Concat($($ApplicationIdUri),'/user_impersonation'))
+                    client_id   = $ClientID
+                    username    = $Username
+                    password    = $Password
+                }
+                $contentType = "application/x-www-form-urlencoded"
+                $uri = "https://login.microsoftonline.com/$($TenantID)/oauth2/v2.0/token"
+                $authToken = Invoke-RestMethod -Method Post -Uri $uri -ContentType $contentType -Body $body
                 Add-TextToCMLog -Value "Successfully retrieved access token." -LogFile $LogFile -Component $component -Severity 1
             }
         }
@@ -487,9 +456,7 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
             }
             'Internet'{
                 $authHeader = @{
-                    'Content-Type'  = 'application/json'
-                    'Authorization' = "Bearer " + $token.AccessToken
-                    'ExpiresOn'	    = $token.ExpiresOn
+                    'Authorization' = "Bearer " + $authToken.access_token
                 }
                 $Packages = Invoke-RestMethod -Method Get -Uri $DecodedURI -Headers $authHeader | Select-Object -ExpandProperty value
             }
@@ -564,6 +531,13 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                 Add-TextToCMLog $LogFile  "Filtering driver packages for the specified OS Architecture: `"$DriverPackageOSArch`"" $component 1
                 $Packages = $Packages | Where-Object{$_.Name -like "* $DriverPackageOSArch*"}
                 Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
+
+                # Filter for OS version
+                If($DriverPackageWinVer -ne "Unknown"){
+                    Add-TextToCMLog $LogFile  "Filtering driver packages for the specified Windows version: `"$DriverPackageWinVer`"" $component 1
+                    $Packages = $Packages | Where-Object{$_.Name -like "* $DriverPackageWinVer*"}
+                    Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
+                }
 
                 #Filter for specific Windows 10 ReleaseId
                 If($DriverPackageReleaseId -ne "Unknown"){
