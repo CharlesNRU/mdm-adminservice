@@ -138,6 +138,7 @@
                         -Body parameter to specify filtering criteria, implemented workaround.
     2.1.1 (2024-04-25): Added Win10/11 filtering. -Dan Hammond (@FlannelNZ)
     2.2.0 (2024-05-01): Removed dependency on MSAL.PS module when using CMG
+    2.3.0 (2026-05-02): Refactor SKU extraction logic to support both legacy and newer DAT formats
 
 #>
 [CmdletBinding()]
@@ -487,29 +488,18 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                 $SystemSKUMatchingPackages = New-Object System.Collections.ArrayList
                 Foreach ($Package in $Packages) {
                     $Description = $package.Description
-                    If ($Description -match "\(Models included:(.*)\) \(Release Date:(.*)\)") {
-                        $SKUList = $matches[1]
-                    }
-                    ElseIf ($Description -match "\(Models included:(.*)\)") {
+                    $SKUList = $null
+                    $PackageSKUs = @()
+
+                    # Support both legacy DAT metadata and newer DAT format:
+                    # "(Models included:09AA,09AB)" and "Models included: 09AA,09AB"
+                    If ($Description -match "(?i)Models included:\s*([^\r\n\)]*)") {
                         $SKUList = $matches[1]
                     }
 
-                    If ($SKUList -match ";") {
-                        $SystemSKUDelimiter = ";"
-                    }
-                    ElseIf ($SKUList -match ",") {
-                        $SystemSKUDelimiter = ","
-                    }
-                    ElseIf ($SKUList -match " ") {
-                        $SystemSKUDelimiter = " "
-                    }
-
-                    If ($SystemSKUDelimiter) {
-                        $PackageSKUs = $SKUList -split $SystemSKUDelimiter
-                    }
-                    Else {
-                        #No SystemSKU delimiter found, assuming only one SystemSKU for this package
-                        $PackageSKUs = $SKUList
+                    If (-not [string]::IsNullOrWhiteSpace($SKUList)) {
+                        # Matches semicolons, commas or whitespace all work in one pass
+                        $PackageSKUs = $SKUList -split "[;,\s]+" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
                     }
 
                     If ($PackageSKUs -contains $SystemSKU) {
