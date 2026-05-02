@@ -143,35 +143,35 @@
 [CmdletBinding()]
 param(
     [parameter(Mandatory = $true, HelpMessage = "Set the FQDN of the server hosting the ConfigMgr AdminService.", ParameterSetName = "Intranet")]
-	[ValidateNotNullOrEmpty()]
-	[string]$ServerFQDN,
+    [ValidateNotNullOrEmpty()]
+    [string]$ServerFQDN,
     
     [parameter(Mandatory = $true, HelpMessage = "Set the CMG ExternalUrl for the AdminService.", ParameterSetName = "Internet")]
-	[ValidateNotNullOrEmpty()]
-	[string]$ExternalUrl,
+    [ValidateNotNullOrEmpty()]
+    [string]$ExternalUrl,
     
     [parameter(Mandatory = $true, HelpMessage = "Set your TenantID.", ParameterSetName = "Internet")]
-	[ValidateNotNullOrEmpty()]
-	[string]$TenantID,
+    [ValidateNotNullOrEmpty()]
+    [string]$TenantID,
     
     [parameter(Mandatory = $true, HelpMessage = "Set the ClientID of app registration to interact with the AdminService.", ParameterSetName = "Internet")]
-	[ValidateNotNullOrEmpty()]
-	[string]$ClientID,
+    [ValidateNotNullOrEmpty()]
+    [string]$ClientID,
     
     [parameter(Mandatory = $false, HelpMessage = "Specify URI here if using non-default Application ID URI for the configuration manager server app.", ParameterSetName = "Internet")]
-	[ValidateNotNullOrEmpty()]
-	[string]$ApplicationIdUri = 'https://ConfigMgrService',
+    [ValidateNotNullOrEmpty()]
+    [string]$ApplicationIdUri = 'https://ConfigMgrService',
         
 
     [parameter(Mandatory = $false, HelpMessage = "Specify the username that will be used to query the AdminService.", ParameterSetName = "Intranet")]
     [parameter(Mandatory = $true, HelpMessage = "Specify the username that will be used to query the AdminService.", ParameterSetName = "Internet")]
-	[ValidateNotNullOrEmpty()]
-	[string]$Username,
+    [ValidateNotNullOrEmpty()]
+    [string]$Username,
 
     [parameter(Mandatory = $false, HelpMessage = "Specify the password for the username that will be used to query the AdminService.", ParameterSetName = "Intranet")]
     [parameter(Mandatory = $true, HelpMessage = "Specify the password for the username that will be used to query the AdminService.", ParameterSetName = "Internet")]
-	[ValidateNotNullOrEmpty()]
-	[string]$Password,
+    [ValidateNotNullOrEmpty()]
+    [string]$Password,
 
     [parameter(Mandatory = $false, HelpMessage = "If set to True, PowerShell will bypass SSL certificate checks when contacting the AdminService.", ParameterSetName = "Intranet")]
     [parameter(Mandatory = $false, HelpMessage = "If set to True, PowerShell will bypass SSL certificate checks when contacting the AdminService.", ParameterSetName = "Internet")]
@@ -224,19 +224,21 @@ param(
     [parameter(Mandatory = $false, HelpMessage = "For BIOSPackages only: Specify the system's current BIOS release date in the following format: yyyyMMdd", ParameterSetName = "Internet")]
     [ValidateNotNullOrEmpty()]
     [ValidateScript({
-        Try{
-            [datetime]::ParseExact($_,"yyyyMMdd",$null)
-            Return $true
-        }Catch{
-            throw "Date format needs to be `"yyyyMMdd`"."
-        }
-    })]
+            Try {
+                [datetime]::ParseExact($_, "yyyyMMdd", $null)
+                Return $true
+            }
+            Catch {
+                throw "Date format needs to be `"yyyyMMdd`"."
+            }
+        })]
     [string]$CurrentBIOSReleaseDate = $(
         $date = Get-CimInstance -ClassName CIM_BIOSElement | Select-Object -ExpandProperty ReleaseDate
-        If($date){
+        If ($date) {
             #BIOS Release Date is not null, assigning the value in the expected format.
             $date | Get-Date -Format "yyyyMMdd"
-        }Else{
+        }
+        Else {
             #BIOS Release Date is null, assigning an old date
             "19700101"
         }
@@ -244,14 +246,14 @@ param(
     
     [parameter(Mandatory = $false, HelpMessage = "Specify the path where the log file will be created.")]
     [ValidateScript({
-        If(-not ($_ | Test-Path)){
-            throw "File or folder does not exist"
-        }
-        If(-not ($_ | Test-Path -PathType Container)){
-            throw "The LogPath must be a folder, not a file."
-        }
-        return $true
-    })]
+            If (-not ($_ | Test-Path)) {
+                throw "File or folder does not exist"
+            }
+            If (-not ($_ | Test-Path -PathType Container)) {
+                throw "The LogPath must be a folder, not a file."
+            }
+            return $true
+        })]
     [System.IO.FileInfo]$LogPath = "$env:SystemRoot\Temp",
 
     [parameter(Mandatory = $false, HelpMessage = "Specify the name of the log file.")]
@@ -260,8 +262,7 @@ param(
 )
 Begin {
     Function Add-TextToCMLog {
-    ##########################################################################################################
-    <#
+        <#
     .SYNOPSIS
        Log to a file in a format that can be read by Trace32.exe / CMTrace.exe
 
@@ -289,90 +290,92 @@ Begin {
        (severity - 3).
 
     #>
-    ##########################################################################################################
 
-    #Define and validate parameters
-    [CmdletBinding()]
-    Param(
-          #Path to the log file
-          [parameter(Mandatory=$True)]
-          [String]$LogFile,
+        #Define and validate parameters
+        [CmdletBinding()]
+        Param(
+            #Path to the log file
+            [parameter(Mandatory = $True)]
+            [String]$LogFile,
 
-          #The information to log
-          [parameter(Mandatory=$True)]
-          [String]$Value,
+            #The information to log
+            [parameter(Mandatory = $True)]
+            [String]$Value,
 
-          #The source of the error
-          [parameter(Mandatory=$True)]
-          [String]$Component,
+            #The source of the error
+            [parameter(Mandatory = $True)]
+            [String]$Component,
 
-          #The severity (1 - Information, 2- Warning, 3 - Error)
-          [parameter(Mandatory=$True)]
-          [ValidateRange(1,3)]
-          [Single]$Severity
-          )
-
-
-    #Obtain UTC offset
-    $DateTime = New-Object -ComObject WbemScripting.SWbemDateTime
-    $DateTime.SetVarDate($(Get-Date))
-    $UtcValue = $DateTime.Value
-    $UtcOffset = $UtcValue.Substring(21, $UtcValue.Length - 21)
+            #The severity (1 - Information, 2- Warning, 3 - Error)
+            [parameter(Mandatory = $True)]
+            [ValidateRange(1, 3)]
+            [Single]$Severity
+        )
 
 
-    #Create the line to be logged
-    $LogLine =  "<![LOG[$Value]LOG]!>" +`
-                "<time=`"$(Get-Date -Format HH:mm:ss.fff)$($UtcOffset)`" " +`
-                "date=`"$(Get-Date -Format M-d-yyyy)`" " +`
-                "component=`"$Component`" " +`
-                "context=`"$([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)`" " +`
-                "type=`"$Severity`" " +`
-                "thread=`"$($pid)`" " +`
-                "file=`"`">"
+        #Obtain UTC offset
+        $DateTime = New-Object -ComObject WbemScripting.SWbemDateTime
+        $DateTime.SetVarDate($(Get-Date))
+        $UtcValue = $DateTime.Value
+        $UtcOffset = $UtcValue.Substring(21, $UtcValue.Length - 21)
 
-    #Write the line to the passed log file
-    Out-File -InputObject $LogLine -Append -NoClobber -Encoding Default -FilePath $LogFile -WhatIf:$False
+
+        #Create the line to be logged
+        $LogLine = "<![LOG[$Value]LOG]!>" + `
+            "<time=`"$(Get-Date -Format HH:mm:ss.fff)$($UtcOffset)`" " + `
+            "date=`"$(Get-Date -Format M-d-yyyy)`" " + `
+            "component=`"$Component`" " + `
+            "context=`"$([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)`" " + `
+            "type=`"$Severity`" " + `
+            "thread=`"$($pid)`" " + `
+            "file=`"`">"
+
+        #Write the line to the passed log file
+        Out-File -InputObject $LogLine -Append -NoClobber -Encoding Default -FilePath $LogFile -WhatIf:$False
 
     }
-	Try{
+    Try {
         $LogFile = Join-Path $LogPath $LogFileName
         $component = "Invoke-GetPackageIDFromAdminService"
         Add-TextToCMLog $LogFile "*******************$component started.*******************" $component 1
-    }Catch{
+    }
+    Catch {
         Write-Error -Message "Failed to write to the logfile `"$LogFile`"" -ErrorAction Stop
     }
     
-    Function Get-AdminServiceUri{
-        If($ServerFQDN){
+    Function Get-AdminServiceUri {
+        If ($ServerFQDN) {
             Return "https://$($ServerFQDN)/AdminService"
         }
-        If($ExternalUrl){
+        If ($ExternalUrl) {
             Return $ExternalUrl
         }
     }
 }
-Process{
-    Try{
-        If((-not $Model -or $Model -eq 'Unknown') -and (-not $SystemSKU -or $SystemSKU -eq 'Unknown')){
+Process {
+    Try {
+        If ((-not $Model -or $Model -eq 'Unknown') -and (-not $SystemSKU -or $SystemSKU -eq 'Unknown')) {
             Add-TextToCMLog -Value "No model or SystemSKU provided, we need at least one of these values to determine a suitable package." -LogFile $LogFile -Component $component -Severity 3
             Return
         }
         
         Add-TextToCMLog -Value "Processing credentials..." -LogFile $LogFile -Component $component -Severity 1
-        switch($PSCmdlet.ParameterSetName){
-            "Intranet"{
-                If($Username){
-                    If($Password){
+        switch ($PSCmdlet.ParameterSetName) {
+            "Intranet" {
+                If ($Username) {
+                    If ($Password) {
                         Add-TextToCMLog -Value "Using provided username & password to query the AdminService." -LogFile $LogFile -Component $component -Severity 3
-                        $Credential = New-Object System.Management.Automation.PSCredential -ArgumentList $Username,($Password | ConvertTo-SecureString -AsPlainText -Force)
+                        $Credential = New-Object System.Management.Automation.PSCredential -ArgumentList $Username, ($Password | ConvertTo-SecureString -AsPlainText -Force)
                         $InvokeRestMethodCredential = @{
                             "Credential" = ($Credential)
                         }
-                    }Else{
+                    }
+                    Else {
                         Add-TextToCMLog -Value "Username provided without a password, please specify a password." -LogFile $LogFile -Component $component -Severity 3
                         Return
                     }
-                }Else{
+                }
+                Else {
                     Add-TextToCMLog -Value "No username provided, using current user credentials to query the AdminService." -LogFile $LogFile -Component $component -Severity 1
                     $InvokeRestMethodCredential = @{
                         "UseDefaultCredentials" = $True
@@ -380,14 +383,14 @@ Process{
                 }
                 
             }
-            "Internet"{
+            "Internet" {
                 Add-TextToCMLog -Value "Getting access token to query the AdminService via CMG." -LogFile $LogFile -Component $component -Severity 1
                 $body = @{
-                    grant_type  = "password"
-                    scope       = ([String]::Concat($($ApplicationIdUri),'/user_impersonation'))
-                    client_id   = $ClientID
-                    username    = $Username
-                    password    = $Password
+                    grant_type = "password"
+                    scope      = ([String]::Concat($($ApplicationIdUri), '/user_impersonation'))
+                    client_id  = $ClientID
+                    username   = $Username
+                    password   = $Password
                 }
                 $contentType = "application/x-www-form-urlencoded"
                 $uri = "https://login.microsoftonline.com/$($TenantID)/oauth2/v2.0/token"
@@ -396,7 +399,7 @@ Process{
             }
         }
 
-        If($BypassCertCheck){
+        If ($BypassCertCheck) {
             Add-TextToCMLog $LogFile  "Bypassing certificate checks to query the AdminService." $component 2
             #Source: https://til.intrepidintegration.com/powershell/ssl-cert-bypass.html
             Add-Type @"
@@ -414,21 +417,23 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Ssl3, [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12
         }
        
-        $WMIPackageURI = [String]::Concat($(Get-AdminServiceUri),"/wmi/SMS_Package")
+        $WMIPackageURI = [String]::Concat($(Get-AdminServiceUri), "/wmi/SMS_Package")
         Add-TextToCMLog $LogFile  "Retrieving list of packages from the AdminService @ `"$($WMIPackageURI)`"" $component 1
 
-        switch($PackageType){
-            "DriverPackage"{
-                If(-not $PilotPackages){
+        switch ($PackageType) {
+            "DriverPackage" {
+                If (-not $PilotPackages) {
                     $Filter = "startswith(Name,'Drivers -')"
-                }Else{
+                }
+                Else {
                     $Filter = "startswith(Name,'Drivers Pilot -')"
                 }
             }
-            "BIOSPackage"{
-                If(-not $PilotPackages){
+            "BIOSPackage" {
+                If (-not $PilotPackages) {
                     $Filter = "startswith(Name,'BIOS Update -')"
-                }Else{
+                }
+                Else {
                     $Filter = "startswith(Name,'BIOS Update Pilot -')"
                 }
             }
@@ -450,11 +455,11 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
         $DecodedURI = [System.Web.HttpUtility]::UrlDecode($Request.Uri)
 
 
-        switch($PSCmdlet.ParameterSetName){
-            'Intranet'{
+        switch ($PSCmdlet.ParameterSetName) {
+            'Intranet' {
                 $Packages = Invoke-RestMethod -Method Get -Uri $DecodedURI @InvokeRestMethodCredential | Select-Object -ExpandProperty value
             }
-            'Internet'{
+            'Internet' {
                 $authHeader = @{
                     'Authorization' = "Bearer " + $authToken.access_token
                 }
@@ -462,57 +467,64 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
             }
         }      
 
-        If(($Packages | Measure-Object).Count -gt 0){
+        If (($Packages | Measure-Object).Count -gt 0) {
             Add-TextToCMLog $LogFile  "Initial count of packages before starting filtering process: $(($Packages | Measure-Object).Count)" $component 1
 
-            If($Manufacturer -and ($Manufacturer -ne 'Unknown')){
+            If ($Manufacturer -and ($Manufacturer -ne 'Unknown')) {
                 # Filter out packages that do not match Manufacturer value
                 Add-TextToCMLog $LogFile  "Filtering package from specified computer manufacturer: $($Manufacturer)" $component 1
-                $Packages = $Packages | Where-Object{$_.Manufacturer -like $Manufacturer}
+                $Packages = $Packages | Where-Object { $_.Manufacturer -like $Manufacturer }
                 Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
             }
 
             # Filter out packages that do not contain any value in the package description
             Add-TextToCMLog $LogFile  "Filtering package results to only include packages that have details added to the description field" $component 1
-            $Packages = $Packages | Where-Object{$_.Description -ne ([string]::Empty)}
+            $Packages = $Packages | Where-Object { $_.Description -ne ([string]::Empty) }
             Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
 
-            If($SystemSKU -and ($SystemSKU -ne 'Unknown')){
+            If ($SystemSKU -and ($SystemSKU -ne 'Unknown')) {
                 Add-TextToCMLog $LogFile  "Filtering package results to only packages that have the SystemSKU `"$($SystemSKU)`" in the description field." $component 1
                 $SystemSKUMatchingPackages = New-Object System.Collections.ArrayList
-                Foreach($Package in $Packages){
+                Foreach ($Package in $Packages) {
                     $Description = $package.Description
-                    If($Description -match "\(Models included:(.*)\) \(Release Date:(.*)\)"){
+                    If ($Description -match "\(Models included:(.*)\) \(Release Date:(.*)\)") {
                         $SKUList = $matches[1]
-                    }ElseIf($Description -match "\(Models included:(.*)\)"){
+                    }
+                    ElseIf ($Description -match "\(Models included:(.*)\)") {
                         $SKUList = $matches[1]
                     }
 
-                    If($SKUList -match ";"){
+                    If ($SKUList -match ";") {
                         $SystemSKUDelimiter = ";"
-                    }ElseIf($SKUList -match ","){
+                    }
+                    ElseIf ($SKUList -match ",") {
                         $SystemSKUDelimiter = ","
-                    }ElseIf($SKUList -match " "){
+                    }
+                    ElseIf ($SKUList -match " ") {
                         $SystemSKUDelimiter = " "
                     }
 
-                    If($SystemSKUDelimiter){
+                    If ($SystemSKUDelimiter) {
                         $PackageSKUs = $SKUList -split $SystemSKUDelimiter
-                    }Else{#No SystemSKU delimiter found, assuming only one SystemSKU for this package
+                    }
+                    Else {
+                        #No SystemSKU delimiter found, assuming only one SystemSKU for this package
                         $PackageSKUs = $SKUList
                     }
 
-                    If($PackageSKUs -contains $SystemSKU){
+                    If ($PackageSKUs -contains $SystemSKU) {
                         [void]$SystemSKUMatchingPackages.add($Package)
                     }
                 }
-                If(($SystemSKUMatchingPackages | Measure-Object).Count -gt 0){
+                If (($SystemSKUMatchingPackages | Measure-Object).Count -gt 0) {
                     $Packages = $SystemSKUMatchingPackages
-                }Else{
-                    If($Model -and ($Model -ne 'Unknown')){
+                }
+                Else {
+                    If ($Model -and ($Model -ne 'Unknown')) {
                         $ModelFilteringNeeded = $true
                         Add-TextToCMLog $LogFile  "Could not find any packages matching SystemSKU `"$SystemSKU`", attempting to filter by model name as a fallback." $component 2
-                    }Else{
+                    }
+                    Else {
                         Add-TextToCMLog $LogFile  "Could not find any packages matching SystemSKU `"$SystemSKU`" and no model name provided as a fallback." $component 3
                         $Packages = $null
                     }
@@ -520,173 +532,185 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                 Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
 
             }
-            If(!$SystemSKU -or $SystemSKU -eq 'Unknown' -or $ModelFilteringNeeded){
+            If (!$SystemSKU -or $SystemSKU -eq 'Unknown' -or $ModelFilteringNeeded) {
                 Add-TextToCMLog $LogFile  "Filtering package results to only packages that have the model name `"$($Model)`" in the package name." $component 1
-                $Packages = $Packages | Where-Object{$_.Name -like "*$Model*"}
+                $Packages = $Packages | Where-Object { $_.Name -like "*$Model*" }
                 Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
             }
             
-            If($PackageType -eq "DriverPackage"){
+            If ($PackageType -eq "DriverPackage") {
                 # Filter for OS Architecture
                 Add-TextToCMLog $LogFile  "Filtering driver packages for the specified OS Architecture: `"$DriverPackageOSArch`"" $component 1
-                $Packages = $Packages | Where-Object{$_.Name -like "* $DriverPackageOSArch*"}
+                $Packages = $Packages | Where-Object { $_.Name -like "* $DriverPackageOSArch*" }
                 Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
 
                 # Filter for OS version
-                If($DriverPackageWinVer -ne "Unknown"){
+                If ($DriverPackageWinVer -ne "Unknown") {
                     Add-TextToCMLog $LogFile  "Filtering driver packages for the specified Windows version: `"$DriverPackageWinVer`"" $component 1
-                    $Packages = $Packages | Where-Object{$_.Name -like "* $DriverPackageWinVer*"}
+                    $Packages = $Packages | Where-Object { $_.Name -like "* $DriverPackageWinVer*" }
                     Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
                 }
 
                 #Filter for specific Windows 10 ReleaseId
-                If($DriverPackageReleaseId -ne "Unknown"){
+                If ($DriverPackageReleaseId -ne "Unknown") {
                     Add-TextToCMLog $LogFile  "Filtering driver package for the specified ReleaseID: `"$DriverPackageReleaseId`"" $component 1
-                    $ReleaseIdPackages = $Packages | Where-Object{$_.Name -like "* $DriverPackageReleaseId *"}
-                    If(($ReleaseIdPackages | Measure-Object).Count -gt 0){
+                    $ReleaseIdPackages = $Packages | Where-Object { $_.Name -like "* $DriverPackageReleaseId *" }
+                    If (($ReleaseIdPackages | Measure-Object).Count -gt 0) {
                         $Packages = $ReleaseIdPackages
-                    }Else{
+                    }
+                    Else {
                         Add-TextToCMLog $LogFile  "Could not find any driver packages for ReleaseID `"$DriverPackageReleaseId`". Ignoring ReleaseId filter..." $component 2
                     }
                     Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
                 }
             }
             
-            If($PackageType -eq "BIOSPackage"){
+            If ($PackageType -eq "BIOSPackage") {
                 # Filter out packages that do not contain any value in the package version
                 Add-TextToCMLog $LogFile  "Filtering package results to only include packages that have version information in the version field" $component 1
-                $Packages = $Packages | Where-Object{$_.Version -ne ([string]::Empty)}
+                $Packages = $Packages | Where-Object { $_.Version -ne ([string]::Empty) }
                 Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
 
                 Add-TextToCMLog $LogFile  "Filtering package results to only BIOS packages that would be an upgrade to the current BIOS." $component 1
                 $ApplicableBIOSPackages = New-Object System.Collections.ArrayList
-                If($Manufacturer -ne "Lenovo"){
+                If ($Manufacturer -ne "Lenovo") {
                     #Check if any of the packages has a BIOS version higher than the current BIOS version
-                    If($CurrentBIOSVersion -and $CurrentBIOSVersion -ne "Unknown"){
+                    If ($CurrentBIOSVersion -and $CurrentBIOSVersion -ne "Unknown") {
                         Add-TextToCMLog $LogFile  "Filtering package results to only packages that have a BIOS version higher than  `"$($CurrentBIOSVersion)`"" $component 1
 
-                        foreach($package in $Packages){
-                            switch($Manufacturer){
-                                "Dell"{
-                                    If($package.Version -as [Version]){
-                                        If($CurrentBIOSVersion -as [Version]){
-                                            If(([Version]$Package.Version) -gt [Version]$CurrentBIOSVersion){
+                        foreach ($package in $Packages) {
+                            switch ($Manufacturer) {
+                                "Dell" {
+                                    If ($package.Version -as [Version]) {
+                                        If ($CurrentBIOSVersion -as [Version]) {
+                                            If (([Version]$Package.Version) -gt [Version]$CurrentBIOSVersion) {
                                                 [void]$ApplicableBIOSPackages.Add($package)
                                             }
-                                        }ElseIf($CurrentBIOSVersion -like "A*"){
+                                        }
+                                        ElseIf ($CurrentBIOSVersion -like "A*") {
                                             #Moving from A__ version to a proper version number is considered an upgrade for Dell systems
                                             [void]$ApplicableBIOSPackages.Add($package)
                                         }
-                                    }ElseIf(($Package.Version -like "A*") -and ($CurrentBIOSVersion -like "A*")){
-                                        If(([Int32]::Parse(($Package.Version).TrimStart("A"))) -gt ([Int32]::Parse(($CurrentBIOSVersion).TrimStart("A")))){
+                                    }
+                                    ElseIf (($Package.Version -like "A*") -and ($CurrentBIOSVersion -like "A*")) {
+                                        If (([Int32]::Parse(($Package.Version).TrimStart("A"))) -gt ([Int32]::Parse(($CurrentBIOSVersion).TrimStart("A")))) {
                                             [void]$ApplicableBIOSPackages.Add($package)
                                         }
                                     }
                                 }
-                                "HP"{
+                                "HP" {
                                     $packageVersion = ($package.Version).TrimEnd(".")
                                     $packageVersion = $packageVersion.Split(" ")[0] #Example: 02.02.03 A 1 --> Will only use 02.02.03 for evaluating
-                                    If($packageVersion -as [Version]){
-                                        If($CurrentBIOSVersion -as [Version]){
-                                            If([Version]$packageVersion -gt [Version]$CurrentBIOSVersion){
+                                    If ($packageVersion -as [Version]) {
+                                        If ($CurrentBIOSVersion -as [Version]) {
+                                            If ([Version]$packageVersion -gt [Version]$CurrentBIOSVersion) {
                                                 [void]$ApplicableBIOSPackages.Add($package)
                                             }
-                                        }Else{#Attempting to extract a version number from the current BIOS version provided
+                                        }
+                                        Else {
+                                            #Attempting to extract a version number from the current BIOS version provided
                                             $CleanBIOSVersion = $CurrentBIOSVersion.TrimEnd(".")
                                             $CleanBIOSVersion = $CleanBIOSVersion.Split(" ")[0]
-                                            If($CleanBIOSVersion -as [Version]){
-                                                If([Version]$packageVersion -gt [Version]$CleanBIOSVersion){
+                                            If ($CleanBIOSVersion -as [Version]) {
+                                                If ([Version]$packageVersion -gt [Version]$CleanBIOSVersion) {
                                                     [void]$ApplicableBIOSPackages.Add($package)
                                                 }
                                             }
                                         }
-                                    }ElseIf($packageVersion -match ".*F\.(\d+)$"){
+                                    }
+                                    ElseIf ($packageVersion -match ".*F\.(\d+)$") {
                                         $packageVersion = $matches[1]
-                                        If($CurrentBIOSVersion -match ".*F\.(\d+)$"){
-                                            If([int32]$packageVersion -gt [int32]$matches[1]){
+                                        If ($CurrentBIOSVersion -match ".*F\.(\d+)$") {
+                                            If ([int32]$packageVersion -gt [int32]$matches[1]) {
                                                 [void]$ApplicableBIOSPackages.add($package)
                                             }
                                         }
                                     }
                                 }
-                                "Microsoft"{
+                                "Microsoft" {
                                     Add-TextToCMLog $LogFile  "No BIOS package will be returned, Microsoft provides firmware updates as part of their driver packages." $component 2
                                 }
-                                default{
+                                default {
                                     #Any other manufacturer: Compare versions only if they both parse as [Version] objects
-                                    If(($package.Version -as [Version]) -and ($CurrentBIOSVersion -as [Version])){
-                                        If([Version]($package.Version) -gt [Version]$CurrentBIOSVersion){
+                                    If (($package.Version -as [Version]) -and ($CurrentBIOSVersion -as [Version])) {
+                                        If ([Version]($package.Version) -gt [Version]$CurrentBIOSVersion) {
                                             [void]$ApplicableBIOSPackages.Add($package)
                                         }
                                     }
                                 }
                             }
                         }
-                    }Else{
+                    }
+                    Else {
                         Add-TextToCMLog $LogFile  "No current BIOS version specified, cannot compare BIOS version." $component 3
                     }
-                }Else{
+                }
+                Else {
                     #Lenovo Only: Check if any of the remaining packages have a BIOS Release Date newer than the current BIOS Release Date
                     Add-TextToCMLog $LogFile  "Filtering package results to only packages that have a BIOS release date newer than `"$($CurrentBIOSReleaseDate)`"." $component 1
-                    $BIOSReleaseDate = [datetime]::ParseExact($CurrentBIOSReleaseDate,"yyyyMMdd",$null)
-                    foreach($package in $Packages){
-                        If($package.Description -match "\(Models included:(.*)\) \(Release Date:(.*)\)"){
-                            Try{
-                                $ReleaseDate = [datetime]::ParseExact($matches[2],"yyyyMMdd",$null)
-                                If($ReleaseDate -gt $BIOSReleaseDate){
+                    $BIOSReleaseDate = [datetime]::ParseExact($CurrentBIOSReleaseDate, "yyyyMMdd", $null)
+                    foreach ($package in $Packages) {
+                        If ($package.Description -match "\(Models included:(.*)\) \(Release Date:(.*)\)") {
+                            Try {
+                                $ReleaseDate = [datetime]::ParseExact($matches[2], "yyyyMMdd", $null)
+                                If ($ReleaseDate -gt $BIOSReleaseDate) {
                                     [void]$ApplicableBIOSPackages.Add($package)
                                 }
-                            }Catch{
+                            }
+                            Catch {
                                 Add-TextToCMLog $LogFile  "Failed to parse `"$matches[2]`" as a BIOS release date for package `"$($package.Name)`", skipping..." $component 2
                             }
                         }
                     }
                 }
 
-                If(($ApplicableBIOSPackages | Measure-Object).Count -gt 0){
+                If (($ApplicableBIOSPackages | Measure-Object).Count -gt 0) {
                     $Packages = $ApplicableBIOSPackages
-                }Else{
+                }
+                Else {
                     $Packages = $null
                 }
                 Add-TextToCMLog $LogFile  "Count of packages after filter processing: $(($Packages | Measure-Object).Count)" $component 1
             }
 
-            switch(($Packages | Measure-Object).Count){
-                0{
-                    switch($PackageType){
-                        "DriverPackage"{
+            switch (($Packages | Measure-Object).Count) {
+                0 {
+                    switch ($PackageType) {
+                        "DriverPackage" {
                             Add-TextToCMLog $LogFile  "No suitable driver package found." $component 3
                         }
-                        "BIOSPackage"{
+                        "BIOSPackage" {
                             Add-TextToCMLog $LogFile  "Could not find any applicable BIOS package." $component 1
                         }
                     }
                 }
-                1{
+                1 {
                     Add-TextToCMLog $LogFile  "Found exactly 1 package after the filtering process." $component 1
                     $SelectedPackage = $Packages
                 }
-                default{
+                default {
                     Add-TextToCMLog $LogFile  "Found multiple packages after the filtering process, will use the most recently created package." $component 1
                     $SelectedPackage = ($Packages | Sort-Object -Property SourceDate -Descending | Select-Object -First 1)
                 }
             }
-        }Else{
+        }
+        Else {
             Add-TextToCMLog $LogFile  "Could not find any packages from the AdminService." $component 3
         }
-    }Catch{
+    }
+    Catch {
         Add-TextToCMLog $LogFile  "Error: $($_.Exception.HResult)): $($_.Exception.Message)" $component 3
         Add-TextToCMLog $LogFile "$($_.InvocationInfo.PositionMessage)" $component 3
         Exit 1
     }
 }
-End{
-    If($SelectedPackage){
+End {
+    If ($SelectedPackage) {
         Add-TextToCMLog $LogFile "Selected Package: `"$($SelectedPackage.Name)`"" $component 1
         Add-TextToCMLog $LogFile "Returning PackageID `"$($SelectedPackage.PackageID)`"" $component 1
     }
     Add-TextToCMLog $LogFile "*******************$component finished.*******************" $component 1
-    If($SelectedPackage){
+    If ($SelectedPackage) {
         Return $($SelectedPackage.PackageID)
     }
 }
